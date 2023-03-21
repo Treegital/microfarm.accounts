@@ -1,0 +1,7 @@
+aiozmq
+cryptography
+minicli
+peewee
+peewee-aio
+pyotp
+short-unique-id
