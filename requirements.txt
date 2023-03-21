@@ -1,5 +1,4 @@
 aiozmq
-cryptography
 minicli
 peewee
 peewee-aio

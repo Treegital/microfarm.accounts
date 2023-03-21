@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microfarm_accounts"
+version = "0.1"
+authors = [
+    {name = "Souheil Chelfouh", email = "sch@treegital.fr"},
+]
+requires-python = ">=3.9"
+classifiers = ["License :: OSI Approved :: MIT License"]
+dependencies = [
+    "aiozmq",
+    "minicli",
+    "peewee",
+    "peewee-aio[aiosqlite]",
+    "pyotp",
+    "short-unique-id",
+]
+
+[project.scripts]
+mfaccounts = "microfarm_accounts.service:run"
+
+[tool.setuptools.packages.find]
+where = ["."]
