@@ -104,7 +104,6 @@ async def serve(config: Path) -> None:
 
     async with manager:
         async with manager.connection():
-            await Account.drop_table()
             await Account.create_table()
 
     service = AccountService(manager)
