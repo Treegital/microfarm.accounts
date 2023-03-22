@@ -7,10 +7,8 @@ import short_id
 from functools import cached_property
 from enum import Enum
 from datetime import datetime
-from peewee_aio import Manager
-
-
-manager = Manager('aiosqlite:///app.db')
+from peewee_aio import AIOModel
+from peewee import IntegrityError
 
 
 class TokenFactory:
@@ -71,7 +69,7 @@ class AccountStatus(str, Enum):
     disabled = 'disabled'
 
 
-class Account(manager.Model):
+class Account(AIOModel):
 
     class Meta:
         table_name = 'accounts'
