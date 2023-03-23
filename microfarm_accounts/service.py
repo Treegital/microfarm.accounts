@@ -1,5 +1,3 @@
-import sys
-import asyncio
 import logging
 from pathlib import Path
 from minicli import run, cli

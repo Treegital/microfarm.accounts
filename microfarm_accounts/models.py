@@ -8,7 +8,6 @@ from functools import cached_property
 from enum import Enum
 from datetime import datetime
 from peewee_aio import AIOModel
-from peewee import IntegrityError
 
 
 class TokenFactory:
