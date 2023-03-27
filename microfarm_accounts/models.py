@@ -1,34 +1,11 @@
 import peewee
 import secrets
-import base64
-import hashlib
-import pyotp
 import short_id
 from functools import cached_property
 from enum import Enum
 from datetime import datetime
 from peewee_aio import AIOModel
 from peewee import IntegrityError
-
-
-class TokenFactory:
-
-    def __init__(self, digits=8, digest=hashlib.sha256, interval=60*60):
-        self.digits = digits
-        self.digest = digest
-        self.interval = interval
-
-    def __call__(self, key: str, name: str):
-        return pyotp.TOTP(
-            key,
-            name=name,
-            digits=self.digits,
-            digest=self.digest,
-            interval=self.interval
-        )
-
-
-token_factory: TokenFactory = TokenFactory()
 
 
 class EnumField(peewee.CharField):
@@ -80,8 +57,3 @@ class Account(AIOModel):
     password = peewee.CharField()
     status = EnumField(AccountStatus, default=AccountStatus.pending)
     creation_date = peewee.DateTimeField(default=creation_date)
-
-    @cached_property
-    def totp(self):
-        key = base64.b32encode(self.salter)
-        return token_factory(key, self.email)

@@ -1,0 +1,38 @@
+"""
+
+    async def create_account(self, data: dict) -> dict:
+
+    @rpc.method
+    async def request_account_token(self, email: str) -> dict:
+
+
+    @rpc.method
+    async def verify_account(self, email: str, otp: str) -> dict:
+
+
+    @rpc.method
+    async def verify_credentials(self, email: str, password: str) -> dict:
+
+
+    @rpc.method
+    async def get_account(self, email: str) -> dict:
+"""
+import pytest
+
+
+pytestmark = pytest.mark.asyncio
+
+
+class TestEmptyDatabase:
+
+    async def test_request_token(self, service, client):
+        response = await client.request_account_token("test@test.com")
+        assert response == {'err': 'Account does not exist.'}
+
+    async def test_verify_account(self, service, client):
+        response = await client.verify_account("test@test.com", "ABC")
+        assert response == {'err': 'Account does not exist.'}
+
+    async def test_verify_credentials(self, service, client):
+        response = await client.verify_credentials("test@test.com", "ABC")
+        assert response == {'err': 'Account does not exist.'}

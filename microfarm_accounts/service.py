@@ -1,7 +1,11 @@
 import logging
+import base64
+import pyotp
+import hashlib
 from pathlib import Path
 from minicli import run, cli
 from aiozmq import rpc
+from peewee_aio import Manager
 from .models import Account, AccountStatus, IntegrityError
 from .schemas import load_account, dump_account, ValidationError
 from .password import verify_password
@@ -10,10 +14,28 @@ from .password import verify_password
 logger = logging.getLogger('microfarm_accounts')
 
 
+class TokenFactory:
+
+    def __init__(self, digits=8, digest=hashlib.sha256, interval=60*60):
+        self.digits = digits
+        self.digest = digest
+        self.interval = interval
+
+    def __call__(self, key: str, name: str):
+        return pyotp.TOTP(
+            key,
+            name=name,
+            digits=self.digits,
+            digest=self.digest,
+            interval=self.interval
+        )
+
+
 class AccountService(rpc.AttrHandler):
 
-    def __init__(self, manager):
+    def __init__(self, manager: Manager, token_factory: TokenFactory):
         self.manager = manager
+        self.token_factory = token_factory
 
     @rpc.method
     async def create_account(self, data: dict) -> dict:
@@ -22,13 +44,19 @@ class AccountService(rpc.AttrHandler):
             account = load_account(data)
         except ValidationError as err:
             return err.normalized_messages()
+
         async with self.manager as manager:
             async with manager.connection():
                 try:
                     await account.save(force_insert=True)
-                    token = account.totp.now()
                 except IntegrityError as err:
                     return {"err": str(err)}
+
+        totp = self.token_factory(
+            base64.b32encode(account.salter),
+            account.email
+        )
+        token = totp.now()
         return {'otp': token}
 
     @rpc.method
@@ -39,7 +67,12 @@ class AccountService(rpc.AttrHandler):
                     account = await Account.get(email=email)
                 except Account.DoesNotExist:
                     return {'err': 'Account does not exist.'}
-                token = account.totp.now()
+
+        totp = self.token_factory(
+            base64.b32encode(account.salter),
+            account.email
+        )
+        token = totp.now()
         return {'otp': token}
 
     @rpc.method
@@ -52,9 +85,13 @@ class AccountService(rpc.AttrHandler):
                         status=AccountStatus.pending
                     )
                 except Account.DoesNotExist:
-                    return {'err': 'Account does not exist.'}
+                    return {'err': 'Account cannot be activated.'}
 
-                if not account.totp.verify(otp):
+                totp = self.token_factory(
+                    base64.b32encode(account.salter),
+                    account.email
+                )
+                if not totp.verify(otp):
                     return {'err': 'Invalid token'}
 
                 account.status = AccountStatus.active
@@ -66,7 +103,10 @@ class AccountService(rpc.AttrHandler):
         async with self.manager:
             async with self.manager.connection():
                 try:
-                    account = await Account.get(email=email)
+                    account = await Account.get(
+                        email=email,
+                        status=AccountStatus.active
+                    )
                 except Account.DoesNotExist:
                     return {'err': 'Account does not exist.'}
         if verify_password(account.password, password):
@@ -88,7 +128,6 @@ class AccountService(rpc.AttrHandler):
 async def serve(config: Path) -> None:
     import tomli
     import logging.config
-    from peewee_aio import Manager
 
     assert config.is_file()
     with config.open("rb") as f:
@@ -104,7 +143,8 @@ async def serve(config: Path) -> None:
         async with manager.connection():
             await Account.create_table()
 
-    service = AccountService(manager)
+    token_factory = TokenFactory()
+    service = AccountService(manager, token_factory)
     server = await rpc.serve_rpc(service, bind=settings['rpc']['bind'])
     print(f" [x] Account Service ({settings['rpc']['bind']})")
     await server.wait_closed()
