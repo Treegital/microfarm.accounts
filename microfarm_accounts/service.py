@@ -43,21 +43,32 @@ class AccountService(rpc.AttrHandler):
         try:
             account = load_account(data)
         except ValidationError as err:
-            return err.normalized_messages()
+            return {
+                "code": 400,
+                "data": err.normalized_messages()
+            }
 
         async with self.manager as manager:
             async with manager.connection():
                 try:
                     await account.save(force_insert=True)
                 except IntegrityError as err:
-                    return {"err": str(err)}
+                    return {
+                        "code": 601,
+                        "description": str(err)
+                    }
 
         totp = self.token_factory(
             base64.b32encode(account.salter),
             account.email
         )
         token = totp.now()
-        return {'otp': token}
+        return {
+            "code": 201,
+            "data": {
+                "otp": token
+            }
+        }
 
     @rpc.method
     async def request_account_token(self, email: str) -> dict:
@@ -66,14 +77,22 @@ class AccountService(rpc.AttrHandler):
                 try:
                     account = await Account.get(email=email)
                 except Account.DoesNotExist:
-                    return {'err': 'Account does not exist.'}
+                    return {
+                        "code": 401,
+                        "description": 'Account does not exist.'
+                    }
 
         totp = self.token_factory(
             base64.b32encode(account.salter),
             account.email
         )
         token = totp.now()
-        return {'otp': token}
+        return {
+            "code": 200,
+            "data": {
+                "otp": token
+            }
+        }
 
     @rpc.method
     async def verify_account(self, email: str, otp: str) -> dict:
@@ -85,18 +104,27 @@ class AccountService(rpc.AttrHandler):
                         status=AccountStatus.pending
                     )
                 except Account.DoesNotExist:
-                    return {'err': 'Account cannot be activated.'}
+                    return {
+                        "code": 401,
+                        "description": 'Account cannot be activated.'
+                    }
 
                 totp = self.token_factory(
                     base64.b32encode(account.salter),
                     account.email
                 )
                 if not totp.verify(otp):
-                    return {'err': 'Invalid token'}
+                    return {
+                        "code": 402,
+                        "description": 'Invalid token.'
+                    }
 
                 account.status = AccountStatus.active
                 await account.save()
-        return dump_account(account)
+        return {
+            "code": 202,
+            "data": dump_account(account)
+        }
 
     @rpc.method
     async def verify_credentials(self, email: str, password: str) -> dict:
@@ -108,10 +136,19 @@ class AccountService(rpc.AttrHandler):
                         status=AccountStatus.active
                     )
                 except Account.DoesNotExist:
-                    return {'err': 'Account does not exist.'}
-        if verify_password(account.password, password):
-            return dump_account(account)
-        return {'err': 'Credentials failed.'}
+                    return {
+                        "code": 401,
+                        "description": 'Account does not exist.'
+                    }
+        if not verify_password(account.password, password):
+            return {
+                "code": 402,
+                "description": 'Credentials did not match.'
+            }
+        return {
+            "code": 202,
+            "data": dump_account(account)
+        }
 
     @rpc.method
     async def get_account(self, email: str) -> dict:
@@ -120,8 +157,14 @@ class AccountService(rpc.AttrHandler):
                 try:
                     account = await Account.get(email=email)
                 except Account.DoesNotExist:
-                    return {'err': 'Account does not exist.'}
-        return dump_account(account)
+                    return {
+                        "code": 401,
+                        "description": 'Account does not exist.'
+                    }
+        return {
+            "code": 202,
+            "data": dump_account(account)
+        }
 
 
 @cli

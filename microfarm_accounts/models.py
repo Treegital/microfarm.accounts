@@ -53,6 +53,7 @@ class Account(AIOModel):
 
     id = peewee.CharField(primary_key=True, default=uniqueid_factory)
     email = peewee.CharField(unique=True)
+    name = peewee.CharField()
     salter = peewee.BlobField(default=salt_generator(24))
     password = peewee.CharField()
     status = EnumField(AccountStatus, default=AccountStatus.pending)
